@@ -17,6 +17,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,9 @@ public class KafkaFailedEventResender {
 
     @Value("${jeap.errorhandling.timeout-seconds:60}")
     private int timeoutSeconds;
+
+    @Value("${spring.application.name}")
+    private String applicationName;
 
     public KafkaFailedEventResender(ResendClusterProvider resendClusterProvider,
                                     KafkaProperties kafkaProperties,
@@ -73,6 +77,7 @@ public class KafkaFailedEventResender {
 
         ProducerRecord<Object, Object> producerRecord = new ProducerRecord<>(topic, key, message);
         addHeadersFromCausingEvent(error, producerRecord);
+        addResendHeaders(error, producerRecord);
         sendResult = kafkaTemplateByClusterName.get(clusterName).send(producerRecord);
 
         try {
@@ -91,6 +96,12 @@ public class KafkaFailedEventResender {
                 producerRecord.headers().add(header.getHeaderName(), header.getHeaderValue());
             }
         }
+    }
+
+    private void addResendHeaders(Error error, ProducerRecord<Object, Object> producerRecord) {
+        String failedService = error.getErrorEventMetadata().getPublisher().getService();
+        producerRecord.headers().add("jeap_eh_failed_service", failedService.getBytes(StandardCharsets.UTF_8));
+        producerRecord.headers().add("jeap_eh_error_handling_service", applicationName.getBytes(StandardCharsets.UTF_8));
     }
 
     private static Map<String, Object> adaptKafkaConfiguration(String clusterName, KafkaConfiguration kafkaConfiguration) {

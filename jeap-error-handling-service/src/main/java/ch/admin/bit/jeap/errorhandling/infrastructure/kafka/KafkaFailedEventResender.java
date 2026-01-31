@@ -36,6 +36,9 @@ public class KafkaFailedEventResender {
     @Value("${jeap.errorhandling.timeout-seconds:60}")
     private int timeoutSeconds;
 
+    @Value("${spring.application.name}")
+    private String applicationName;
+
     public KafkaFailedEventResender(ResendClusterProvider resendClusterProvider,
                                     KafkaProperties kafkaProperties,
                                     KafkaConfiguration kafkaConfiguration,
@@ -73,6 +76,7 @@ public class KafkaFailedEventResender {
 
         ProducerRecord<Object, Object> producerRecord = new ProducerRecord<>(topic, key, message);
         addHeadersFromCausingEvent(error, producerRecord);
+        addResendHeaders(error, producerRecord);
         sendResult = kafkaTemplateByClusterName.get(clusterName).send(producerRecord);
 
         try {
@@ -91,6 +95,12 @@ public class KafkaFailedEventResender {
                 producerRecord.headers().add(header.getHeaderName(), header.getHeaderValue());
             }
         }
+    }
+
+    private void addResendHeaders(Error error, ProducerRecord<Object, Object> producerRecord) {
+        String failedService = error.getCausingEventMetadata().getPublisher().getService();
+        producerRecord.headers().add("jeap_eh_failed_service", failedService.getBytes());
+        producerRecord.headers().add("jeap_eh_error_handling_service", applicationName.getBytes());
     }
 
     private static Map<String, Object> adaptKafkaConfiguration(String clusterName, KafkaConfiguration kafkaConfiguration) {

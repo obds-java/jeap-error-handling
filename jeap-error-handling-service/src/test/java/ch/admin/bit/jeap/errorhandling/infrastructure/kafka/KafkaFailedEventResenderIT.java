@@ -110,6 +110,32 @@ class KafkaFailedEventResenderIT extends ErrorHandlingITBase {
         assertThat(hasEventBeenResent(error.getCausingEvent())).isTrue();
     }
 
+    @Test
+    void resend_resendHeadersAreAdded() {
+        //given
+        final Error temporaryError = ErrorStubs.createTemporaryError();
+        
+        //when
+        kafkaFailedEventResender.resend(temporaryError);
+        
+        //then
+        ConsumerRecords<Object, Object> records = consumeAllEvents();
+        assertThat(records.count()).isGreaterThan(0);
+        
+        ConsumerRecord<Object, Object> record = Streams.stream(records)
+                .filter(r -> Arrays.equals((byte[]) r.value(), temporaryError.getCausingEvent().getMessage().getPayload()))
+                .findFirst()
+                .orElseThrow();
+        
+        assertThat(record.headers().lastHeader("jeap_eh_failed_service")).isNotNull();
+        assertThat(new String(record.headers().lastHeader("jeap_eh_failed_service").value()))
+                .isEqualTo(ErrorStubs.EVENT_PUBLISHER_SERVICE);
+        
+        assertThat(record.headers().lastHeader("jeap_eh_error_handling_service")).isNotNull();
+        assertThat(new String(record.headers().lastHeader("jeap_eh_error_handling_service").value()))
+                .isEqualTo("jeap-error-handling-service");
+    }
+
     @AfterEach
     void cleanUp() {
         scheduledResendRepository.deleteAll();

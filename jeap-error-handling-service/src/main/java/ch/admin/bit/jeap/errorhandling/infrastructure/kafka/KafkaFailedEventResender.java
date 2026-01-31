@@ -17,6 +17,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -99,8 +100,8 @@ public class KafkaFailedEventResender {
 
     private void addResendHeaders(Error error, ProducerRecord<Object, Object> producerRecord) {
         String failedService = error.getCausingEventMetadata().getPublisher().getService();
-        producerRecord.headers().add("jeap_eh_failed_service", failedService.getBytes());
-        producerRecord.headers().add("jeap_eh_error_handling_service", applicationName.getBytes());
+        producerRecord.headers().add("jeap_eh_failed_service", failedService.getBytes(StandardCharsets.UTF_8));
+        producerRecord.headers().add("jeap_eh_error_handling_service", applicationName.getBytes(StandardCharsets.UTF_8));
     }
 
     private static Map<String, Object> adaptKafkaConfiguration(String clusterName, KafkaConfiguration kafkaConfiguration) {

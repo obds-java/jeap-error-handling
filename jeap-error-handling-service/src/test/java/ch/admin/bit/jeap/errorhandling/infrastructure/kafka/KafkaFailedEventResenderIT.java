@@ -136,6 +136,44 @@ class KafkaFailedEventResenderIT extends ErrorHandlingITBase {
                 .isEqualTo("jeap-error-handling-service");
     }
 
+    @Test
+    void resend_resendHeadersOverwriteExistingHeaders() {
+        //given
+        final Error temporaryError = ErrorStubs.createTemporaryError();
+        // Add pre-existing headers with the same names
+        temporaryError.getCausingEvent().getHeaders().add(MessageHeader.builder()
+                .headerName("jeap_eh_failed_service")
+                .headerValue("old-service-name".getBytes())
+                .build());
+        temporaryError.getCausingEvent().getHeaders().add(MessageHeader.builder()
+                .headerName("jeap_eh_error_handling_service")
+                .headerValue("old-ehs-name".getBytes())
+                .build());
+        
+        //when
+        kafkaFailedEventResender.resend(temporaryError);
+        
+        //then
+        ConsumerRecords<Object, Object> records = consumeAllEvents();
+        assertThat(records.count()).isGreaterThan(0);
+        
+        ConsumerRecord<Object, Object> record = Streams.stream(records)
+                .filter(r -> Arrays.equals((byte[]) r.value(), temporaryError.getCausingEvent().getMessage().getPayload()))
+                .findFirst()
+                .orElseThrow();
+        
+        // Verify that the headers have been overwritten with new values
+        assertThat(record.headers().lastHeader("jeap_eh_failed_service")).isNotNull();
+        assertThat(new String(record.headers().lastHeader("jeap_eh_failed_service").value()))
+                .isEqualTo(ErrorStubs.EVENT_PUBLISHER_SERVICE)
+                .isNotEqualTo("old-service-name");
+        
+        assertThat(record.headers().lastHeader("jeap_eh_error_handling_service")).isNotNull();
+        assertThat(new String(record.headers().lastHeader("jeap_eh_error_handling_service").value()))
+                .isEqualTo("jeap-error-handling-service")
+                .isNotEqualTo("old-ehs-name");
+    }
+
     @AfterEach
     void cleanUp() {
         scheduledResendRepository.deleteAll();

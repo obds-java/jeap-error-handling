@@ -99,7 +99,7 @@ public class KafkaFailedEventResender {
     }
 
     private void addResendHeaders(Error error, ProducerRecord<Object, Object> producerRecord) {
-        String failedService = error.getCausingEventMetadata().getPublisher().getService();
+        String failedService = error.getErrorEventMetadata().getPublisher().getService();
         producerRecord.headers().add("jeap_eh_failed_service", failedService.getBytes(StandardCharsets.UTF_8));
         producerRecord.headers().add("jeap_eh_error_handling_service", applicationName.getBytes(StandardCharsets.UTF_8));
     }
